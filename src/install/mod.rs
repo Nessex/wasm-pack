@@ -125,27 +125,30 @@ pub fn download_prebuilt(
     version: &str,
     install_permitted: bool,
 ) -> Result<Status, failure::Error> {
-    let url = match prebuilt_url(tool, version) {
-        Ok(url) => url,
-        Err(e) => bail!(
-            "no prebuilt {} binaries are available for this platform: {}",
-            tool,
-            e,
-        ),
+    let mut platform_err_msg = "".to_string();
+    let (url, install_permitted) = match prebuilt_url(tool, version) {
+        Ok(url) => (url, install_permitted),
+        Err(e) => {
+            // We cannot download, but we can still check the cache
+            platform_err_msg = format!("\nNo prebuilt {} binaries are available for this platform: {}", tool, e);
+
+            ("".to_string(), false)
+        }
     };
+
     match tool {
         Tool::WasmBindgen => {
             let binaries = &["wasm-bindgen", "wasm-bindgen-test-runner"];
             match cache.download(install_permitted, "wasm-bindgen", binaries, &url)? {
                 Some(download) => Ok(Status::Found(download)),
-                None => bail!("wasm-bindgen v{} is not installed!", version),
+                None => bail!("wasm-bindgen v{} is not installed!{}", version, platform_err_msg),
             }
         }
         Tool::CargoGenerate => {
             let binaries = &["cargo-generate"];
             match cache.download(install_permitted, "cargo-generate", binaries, &url)? {
                 Some(download) => Ok(Status::Found(download)),
-                None => bail!("cargo-generate v{} is not installed!", version),
+                None => bail!("cargo-generate v{} is not installed!{}", version, platform_err_msg),
             }
         }
         Tool::WasmOpt => {
